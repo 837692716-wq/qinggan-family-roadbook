@@ -7,7 +7,7 @@ async function readSharedItinerary(){
   const status=document.getElementById('updated');if(status)status.textContent='正在解锁行程…';
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);
   let response;
-  try{response=await fetch('./itinerary.enc?rev=3',{cache:'no-store',credentials:'omit',signal:controller.signal});}
+  try{response=await fetch('./itinerary.enc?rev=4',{cache:'no-store',credentials:'omit',signal:controller.signal});}
   catch(error){if(error?.name==='AbortError')throw new Error('网络连接较慢，行程下载超时。请切换网络后刷新页面。');throw error;}
   finally{clearTimeout(timer);}
   if(!response.ok)throw new Error('行程暂未加载，请稍后刷新。');

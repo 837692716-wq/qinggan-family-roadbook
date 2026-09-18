@@ -2,7 +2,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const palette=['#e4572e','#bc870c','#2e86ab','#2a9d8f','#6654a3','#d1495b','#64748b'];
-let data, map, layer, active='drive', currentBounds, markers=new Map();
+let data, map, layer, baseImage, baseMaps={}, active='drive', currentBounds, markers=new Map();
 const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 const safeHref=raw=>{try{const u=new URL(raw,location.origin);return (u.protocol==='https:'||u.protocol==='http:')?u.href:null;}catch{return null;}};
 const dateOf=t=>t.name.match(/^10\/(\d{2}) 道路总览/)?'2026-10-'+t.name.match(/^10\/(\d{2})/)[1]:null;
@@ -47,6 +47,7 @@ function getSelection(){
   return {points:ordered.map(id=>places().find(p=>p.id===id)).filter(Boolean),routes:tracks().filter(t=>dateOf(t)===active),day};
 }
 function choose(next){active=next;const u=new URL(location.href);u.searchParams.set('day',next);history.replaceState(null,'',u);render();}
+function setBaseMap(id){if(baseImage){map.removeLayer(baseImage);baseImage=null;}const item=baseMaps[id]||baseMaps.drive||baseMaps.all;if(!item){$('tile-warning').hidden=false;return;}baseImage=L.imageOverlay(item.url,item.bounds,{opacity:1,interactive:false,crossOrigin:true}).addTo(map);baseImage.bringToBack();$('tile-warning').hidden=true;}
 function button(text,fn,cls){const b=el('button',text,cls);b.type='button';b.addEventListener('click',fn);return b;}
 function renderDates(){
   $('dates').replaceChildren();
@@ -84,7 +85,7 @@ function addPointCard(p,index){
   c.append(actions);addGuideAndDraft(c,p);$('cards').append(c);
 }
 function render(){
-  renderDates();layer.clearLayers();markers.clear();$('cards').replaceChildren();$('legend').replaceChildren();
+  renderDates();layer.clearLayers();markers.clear();$('cards').replaceChildren();$('legend').replaceChildren();setBaseMap(active);
   const {points,routes,day}=getSelection();let bounds=[];
   routes.forEach(t=>{let line;try{line=JSON.parse(t.route_geometry);}catch{return;}if(!Array.isArray(line)||line.length<2)return;const color=t.route_color||'#315a48';
     L.polyline(line,{color:'#fffdf7',weight:8,opacity:.92,interactive:false}).addTo(layer);
@@ -114,13 +115,9 @@ async function init(){
     $('updated').textContent='更新于 '+new Date(data.publishedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour12:false});
     if(!Array.isArray(data.places)||!Array.isArray(data.days))throw new Error('行程数据格式不匹配，未显示未经核验的地图。');
     $('content').hidden=false;$('stats').replaceChildren();for(const [value,label]of [[places().filter(p=>p.lat!=null).length,'定位点'],[tracks().length,'道路轨迹'],['1','现场择点']]){const d=el('div');d.append(el('strong',String(value)),el('small',label));$('stats').append(d);}
-    map=L.map('map',{zoomControl:false,scrollWheelZoom:true,preferCanvas:true,minZoom:2,maxZoom:18,maxBounds:[[-85,-180],[85,180]],maxBoundsViscosity:1}).setView([37.9,102],7);L.control.zoom({position:'topright',zoomInTitle:'放大',zoomOutTitle:'缩小'}).addTo(map);L.control.scale({imperial:false,position:'bottomleft'}).addTo(map);
+    map=L.map('map',{zoomControl:false,scrollWheelZoom:true,preferCanvas:true,minZoom:2,maxZoom:18,zoomSnap:.25,zoomDelta:.5,maxBounds:[[-85,-180],[85,180]],maxBoundsViscosity:1}).setView([37.9,102],7);L.control.zoom({position:'topright',zoomInTitle:'放大',zoomOutTitle:'缩小'}).addTo(map);L.control.scale({imperial:false,position:'bottomleft'}).addTo(map);
     layer=L.layerGroup().addTo(map);
-    try{
-      const basemap=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,crossOrigin:true,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
-      basemap.on('tileerror',()=>{$('tile-warning').hidden=false;});
-      basemap.on('load',()=>{$('tile-warning').hidden=true;});
-    }catch{$('tile-warning').hidden=false;}
+    try{const baseResponse=await fetch('./basemaps/index.json?rev=1',{cache:'force-cache',credentials:'omit'});if(baseResponse.ok)baseMaps=(await baseResponse.json()).maps||{};}catch{$('tile-warning').hidden=false;}
     $('fit').addEventListener('click',()=>{if(currentBounds)map.fitBounds(currentBounds,{padding:[35,55],maxZoom:14});});
     const wanted=new URL(location.href).searchParams.get('day');if(wanted&&(['all','drive'].includes(wanted)||data.days.some(d=>d.date===wanted)))active=wanted;render();
   }catch(error){$('error').hidden=false;$('error').textContent=error.message;$('stats').textContent='未完成加载';}
