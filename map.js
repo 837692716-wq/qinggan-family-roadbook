@@ -117,10 +117,9 @@ async function init(){
     map=L.map('map',{zoomControl:false,scrollWheelZoom:true,preferCanvas:true,minZoom:2,maxZoom:18,maxBounds:[[-85,-180],[85,180]],maxBoundsViscosity:1}).setView([37.9,102],7);L.control.zoom({position:'topright',zoomInTitle:'放大',zoomOutTitle:'缩小'}).addTo(map);L.control.scale({imperial:false,position:'bottomleft'}).addTo(map);
     layer=L.layerGroup().addTo(map);
     try{
-      const basemap=L.maplibreGL({style:'https://tiles.openfreemap.org/styles/liberty',interactive:false,attribution:'<a href="https://openfreemap.org/">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/">OpenMapTiles</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
-      const gl=basemap.getMaplibreMap();
-      gl.on('error',()=>{$('tile-warning').hidden=false;});
-      gl.on('idle',()=>{$('tile-warning').hidden=true;});
+      const basemap=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,crossOrigin:true,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
+      basemap.on('tileerror',()=>{$('tile-warning').hidden=false;});
+      basemap.on('load',()=>{$('tile-warning').hidden=true;});
     }catch{$('tile-warning').hidden=false;}
     $('fit').addEventListener('click',()=>{if(currentBounds)map.fitBounds(currentBounds,{padding:[35,55],maxZoom:14});});
     const wanted=new URL(location.href).searchParams.get('day');if(wanted&&(['all','drive'].includes(wanted)||data.days.some(d=>d.date===wanted)))active=wanted;render();
